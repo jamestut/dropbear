@@ -60,7 +60,7 @@ static void printhelp(const char * progname) {
 #if DROPBEAR_DELAY_HOSTKEY
 					"-R		Create hostkeys as required\n" 
 #endif
-					"-F		Don't fork into background\n"
+					"-F		Fork into background\n"
 #ifdef DISABLE_SYSLOG
 					"(Syslog support not compiled in, using stderr)\n"
 #else
@@ -135,7 +135,7 @@ void svr_getopts(int argc, char ** argv) {
 	svr_opts.bannerfile = NULL;
 	svr_opts.banner = NULL;
 	svr_opts.forced_command = NULL;
-	svr_opts.forkbg = 1;
+	svr_opts.forkbg = 0;
 	svr_opts.norootlogin = 0;
 #ifdef HAVE_GETGROUPLIST
 	svr_opts.restrict_group = NULL;
@@ -199,7 +199,7 @@ void svr_getopts(int argc, char ** argv) {
 					svr_opts.delay_hostkey = 1;
 					break;
 				case 'F':
-					svr_opts.forkbg = 0;
+					svr_opts.forkbg = 1;
 					break;
 #ifndef DISABLE_SYSLOG
 				case 'E':
