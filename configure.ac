@@ -358,6 +358,49 @@ AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
 
+# from OpenSSH
+# These should ideally be dynamically defined based on platform capabilities,
+# however, we're assuming targetting modern Linux for now.
+AC_DEFINE([HAVE_U_INTXX_T], [], [Description])
+AC_DEFINE([HAVE_INTXX_T], [], [Description])
+AC_DEFINE([HAVE_INT64_T], [], [Description])
+AC_DEFINE([HAVE_INTMAX_T], [], [Description])
+AC_DEFINE([HAVE_UINTXX_T], [], [Description])
+AC_DEFINE([HAVE_UINTMAX_T], [], [Description])
+AC_DEFINE([HAVE_U_CHAR], [], [Description])
+AC_DEFINE([HAVE_U_INT], [], [Description])
+AC_DEFINE([HAVE_U_INT64_T], [], [Description])
+AC_DEFINE([HAVE_SIZE_T], [], [Description])
+AC_DEFINE([HAVE_SSIZE_T], [], [Description])
+AC_DEFINE([HAVE_SA_FAMILY_T], [], [Description])
+AC_DEFINE([HAVE_MODE_T], [], [Description])
+AC_DEFINE([HAVE_FD_MASK], [], [Description])
+AC_DEFINE([HAVE_ATTRIBUTE__NONNULL__], [], [Description])
+AC_DEFINE([HAVE_STRUCT_TIMESPEC], [], [Description])
+AC_DEFINE([HAVE_STRUCT_TIMEVAL], [], [Description])
+AC_DEFINE([HAVE_UTIMES], [], [Description])
+AC_DEFINE([HAVE_UTIME_H], [], [Description])
+AC_DEFINE([SNPRINTF_CONST], [], [Description])
+AC_DEFINE([HAVE_SNPRINTF], [], [Description])
+AC_DEFINE([HAVE_VSNPRINTF], [], [Description])
+AC_DEFINE([HAVE_MBLEN], [], [Description])
+AC_DEFINE([HAVE_VASPRINTF], [], [Description])
+AC_DEFINE([HAVE_VA_COPY], [], [Description])
+AC_DEFINE([HAVE_TRUNCATE], [], [Description])
+AC_DEFINE([HAVE_TCGETPGRP], [], [Description])
+AC_DEFINE([HAVE_TCSENDBREAK], [], [Description])
+AC_DEFINE([HAVE_MBTOWC], [], [Description])
+AC_DEFINE([HAVE_STATVFS], [], [Description])
+AC_DEFINE([HAVE_FSTATVFS], [], [Description])
+AC_DEFINE([HAVE_WAITPID], [], [Description])
+AC_DEFINE([HAVE_GETCWD], [], [Description])
+AC_DEFINE([HAVE_ENDGRENT], [], [Description])
+AC_DEFINE([HAVE_INET_NTOP], [], [Description])
+AC_DEFINE([HAVE_SETENV], [], [Description])
+AC_DEFINE([HAVE_UNSETENV], [], [Description])
+AC_DEFINE([HAVE_STRPTIME], [], [Description])
+AC_DEFINE([HAVE_STRTOUL], [], [Description])
+
 AC_CHECK_TYPES([uint8_t, u_int8_t, uint16_t, u_int16_t, uint32_t, u_int32_t])
 AC_CHECK_TYPES([struct sockaddr_storage])
 AC_CHECK_TYPE([socklen_t], ,[
@@ -836,7 +879,7 @@ LIBTOM_FILES="libtomcrypt/Makefile libtommath/Makefile"
 fi
 
 AC_CONFIG_HEADER(config.h)
-AC_CONFIG_FILES(Makefile $LIBTOM_FILES)
+AC_CONFIG_FILES(Makefile openbsd-compat/Makefile $LIBTOM_FILES)
 AC_OUTPUT
 
 AC_MSG_NOTICE()
