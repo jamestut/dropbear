@@ -26,7 +26,7 @@
 
 #define DROPBEAR_BUFFER_H_
 
-#include "openssh-includes.h"
+#include "includes.h"
 
 struct buf {
 	/* don't manipulate data member outside of buffer.c - it
