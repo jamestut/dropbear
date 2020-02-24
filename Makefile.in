@@ -46,7 +46,7 @@ COMMONOBJS=dbutil.o buffer.o dbhelpers.o \
 SVROBJS=svr-kex.o svr-auth.o sshpty.o \
 		svr-authpasswd.o svr-authpubkey.o svr-authpubkeyoptions.o svr-session.o svr-service.o \
 		svr-chansession.o svr-runopts.o svr-agentfwd.o svr-main.o svr-x11fwd.o\
-		svr-tcpfwd.o svr-authpam.o
+		svr-tcpfwd.o svr-authpam.o startsftp.o
 
 CLIOBJS=cli-main.o cli-auth.o cli-authpasswd.o cli-kex.o \
 		cli-session.o cli-runopts.o cli-chansession.o \
@@ -64,7 +64,7 @@ CONVERTOBJS=dropbearconvert.o keyimport.o
 
 SCPOBJS=scp.o progressmeter.o atomicio.o scpmisc.o compat.o
 
-SFTPOBJS=sftp-server-main.o sftp-server.o xmalloc.o log.o match.o \
+SFTPOBJS=sftp-server.o xmalloc.o log.o match.o \
 			misc.o sshbuf.o sshbuf-getput-basic.o ssherr.o sftp-common.o \
 			$(OPENBSD_COMPAT)
 
@@ -191,14 +191,14 @@ inst_%: %
 inst_dropbearmulti: $(addprefix insmulti, $(PROGRAMS)) 
 
 # for some reason the rule further down doesn't like $($@objs) as a prereq.
-dropbear: $(dropbearobjs)
+dropbear: $(dropbearobjs) $(SFTPOBJS)
 dbclient: $(dbclientobjs)
 dropbearkey: $(dropbearkeyobjs)
 dropbearconvert: $(dropbearconvertobjs)
-sftpserver: $(SFTPOBJS)
+sftpserver: sftp-server-main.o $(SFTPOBJS)
 
 dropbear: $(HEADERS) $(LIBTOM_DEPS) Makefile
-	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $($@objs) $(LIBTOM_LIBS) $(LIBS) @CRYPTLIB@
+	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $($@objs) $(SFTPOBJS) $(LIBTOM_LIBS) $(LIBS) @CRYPTLIB@
 
 dbclient: $(HEADERS) $(LIBTOM_DEPS) Makefile
 	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $($@objs) $(LIBTOM_LIBS) $(LIBS)
@@ -211,7 +211,7 @@ scp: $(SCPOBJS)  $(HEADERS) Makefile
 	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $(SCPOBJS)
 
 sftpserver: $(HEADERS) Makefile
-	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $(SFTPOBJS)
+	$(CC) $(LDFLAGS) -o $@$(EXEEXT) sftp-server-main.o $(SFTPOBJS)
 
 # multi-binary compilation.
 MULTIOBJS=
