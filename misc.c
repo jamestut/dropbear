@@ -32,7 +32,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
-#include <sys/un.h>
+//#include <sys/un.h>
 
 #include <limits.h>
 #ifdef HAVE_LIBGEN_H
@@ -67,7 +67,7 @@
 #include "xmalloc.h"
 #include "misc.h"
 #include "log.h"
-#include "ssh.h"
+#include "openssh-ssh.h"
 #include "sshbuf.h"
 #include "ssherr.h"
 #include "uidswap.h"

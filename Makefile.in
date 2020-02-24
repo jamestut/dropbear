@@ -30,6 +30,10 @@ CFLAGS+=-DLOCALOPTIONS_H_EXISTS
 OPTION_HEADERS += localoptions.h
 endif
 
+OPENBSD_COMPAT=openbsd-compat/libopenbsd-compat.a
+$(OPENBSD_COMPAT): openbsd-compat/openbsd-compat.h
+	(cd openbsd-compat && $(MAKE))
+
 COMMONOBJS=dbutil.o buffer.o dbhelpers.o \
 		dss.o bignum.o \
 		signkey.o rsa.o dbrandom.o \
@@ -59,6 +63,10 @@ KEYOBJS=dropbearkey.o
 CONVERTOBJS=dropbearconvert.o keyimport.o
 
 SCPOBJS=scp.o progressmeter.o atomicio.o scpmisc.o compat.o
+
+SFTPOBJS=sftp-server-main.o sftp-server.o xmalloc.o log.o match.o \
+			misc.o sshbuf.o sshbuf-getput-basic.o ssherr.o sftp-common.o \
+			$(OPENBSD_COMPAT)
 
 ifeq (@DROPBEAR_FUZZ@, 1)
 	allobjs = $(COMMONOBJS) fuzz-common.o  fuzz-wrapfd.o $(CLISVROBJS) $(CLIOBJS) $(SVROBJS) @CRYPTLIB@
@@ -187,6 +195,7 @@ dropbear: $(dropbearobjs)
 dbclient: $(dbclientobjs)
 dropbearkey: $(dropbearkeyobjs)
 dropbearconvert: $(dropbearconvertobjs)
+sftpserver: $(SFTPOBJS)
 
 dropbear: $(HEADERS) $(LIBTOM_DEPS) Makefile
 	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $($@objs) $(LIBTOM_LIBS) $(LIBS) @CRYPTLIB@
@@ -201,6 +210,8 @@ dropbearkey dropbearconvert: $(HEADERS) $(LIBTOM_DEPS) Makefile
 scp: $(SCPOBJS)  $(HEADERS) Makefile
 	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $(SCPOBJS)
 
+sftpserver: $(HEADERS) Makefile
+	$(CC) $(LDFLAGS) -o $@$(EXEEXT) $(SFTPOBJS)
 
 # multi-binary compilation.
 MULTIOBJS=
