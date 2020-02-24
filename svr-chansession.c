@@ -37,6 +37,7 @@
 #include "agentfwd.h"
 #include "runopts.h"
 #include "auth.h"
+#include "startsftp.h"
 
 /* Handles sessions (either shells or programs) requested by the client */
 
@@ -44,9 +45,11 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 		int iscmd, int issubsys);
 static int sessionpty(struct ChanSess * chansess);
 static int sessionsignal(const struct ChanSess *chansess);
+static int internalsftpcommand(struct Channel *channel, struct ChanSess *chansess);
 static int noptycommand(struct Channel *channel, struct ChanSess *chansess);
 static int ptycommand(struct Channel *channel, struct ChanSess *chansess);
 static int sessionwinchange(const struct ChanSess *chansess);
+static void execinternalsftp(const void *user_data);
 static void execchild(const void *user_data_chansess);
 static void addchildpid(struct ChanSess *chansess, pid_t pid);
 static void sesssigchild_handler(int val);
@@ -682,8 +685,7 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 		if (issubsys) {
 #if DROPBEAR_SFTPSERVER
 			if ((cmdlen == 4) && strncmp(chansess->cmd, "sftp", 4) == 0) {
-				m_free(chansess->cmd);
-				chansess->cmd = m_strdup(SFTPSERVER_PATH);
+				// do nothing
 			} else 
 #endif
 			{
@@ -722,7 +724,11 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 
 	if (chansess->term == NULL) {
 		/* no pty */
-		ret = noptycommand(channel, chansess);
+		/* use the built in SFTP if user asked so */
+		if(chansess->cmd && issubsys && strcmp(chansess->cmd, "sftp") == 0)
+			ret = internalsftpcommand(channel, chansess);
+		else
+			ret = noptycommand(channel, chansess);
 		if (ret == DROPBEAR_SUCCESS) {
 			channel->prio = DROPBEAR_CHANNEL_PRIO_BULK;
 			update_channel_prio();
@@ -742,6 +748,47 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 	}
 	return ret;
 }
+
+/* Execute internal SFTP command. Follows noptycommand's behaviour.
+ * Returns DROPBEAR_SUCCESS or DROPBEAR_FAILURE */
+static int internalsftpcommand(struct Channel *channel, struct ChanSess *chansess) {
+	int ret;
+
+	TRACE(("enter internalsftpcommand"))
+	ret = spawn_command(execinternalsftp, chansess, 
+			&channel->writefd, &channel->readfd, &channel->errfd,
+			&chansess->pid);
+
+	if (ret == DROPBEAR_FAILURE) {
+		return ret;
+	}
+
+	ses.maxfd = MAX(ses.maxfd, channel->writefd);
+	ses.maxfd = MAX(ses.maxfd, channel->readfd);
+	ses.maxfd = MAX(ses.maxfd, channel->errfd);
+
+	addchildpid(chansess, chansess->pid);
+
+	if (svr_ses.lastexit.exitpid != -1) {
+		unsigned int i;
+		TRACE(("parent side: lastexitpid is %d", svr_ses.lastexit.exitpid))
+		/* The child probably exited and the signal handler triggered
+		 * possibly before we got around to adding the childpid. So we fill
+		 * out its data manually */
+		for (i = 0; i < svr_ses.childpidsize; i++) {
+			if (svr_ses.childpids[i].pid == svr_ses.lastexit.exitpid) {
+				TRACE(("found match for lastexitpid"))
+				svr_ses.childpids[i].chansess->exit = svr_ses.lastexit;
+				svr_ses.lastexit.exitpid = -1;
+				break;
+			}
+		}
+	}
+
+	TRACE(("leave internalsftpcommand"))
+	return DROPBEAR_SUCCESS;
+}
+
 
 /* Execute a command and set up redirection of stdin/stdout/stderr without a
  * pty.
@@ -916,6 +963,101 @@ static void addchildpid(struct ChanSess *chansess, pid_t pid) {
 	svr_ses.childpids[i].pid = pid;
 	svr_ses.childpids[i].chansess = chansess;
 
+}
+
+/* Clean up, drop to user privileges, set up the environment and execute
+ * the internal SFTP function. This function does not return. */
+static void execinternalsftp(const void *user_data) {
+	const struct ChanSess *chansess = user_data;
+
+	/* with uClinux we'll have vfork()ed, so don't want to overwrite the
+	 * hostkey. can't think of a workaround to clear it */
+#if !DROPBEAR_VFORK
+	/* wipe the hostkey */
+	sign_key_free(svr_opts.hostkey);
+	svr_opts.hostkey = NULL;
+
+	/* overwrite the prng state */
+	seedrandom();
+#endif
+
+	/* clear environment */
+	/* if we're debugging using valgrind etc, we need to keep the LD_PRELOAD
+	 * etc. This is hazardous, so should only be used for debugging. */
+#ifndef DEBUG_VALGRIND
+#ifdef HAVE_CLEARENV
+	clearenv();
+#else /* don't HAVE_CLEARENV */
+	/* Yay for posix. */
+	if (environ) {
+		environ[0] = NULL;
+	}
+#endif /* HAVE_CLEARENV */
+#endif /* DEBUG_VALGRIND */
+
+#if DROPBEAR_SVR_MULTIUSER
+	/* We can only change uid/gid as root ... */
+	if (getuid() == 0) {
+
+		if ((setgid(ses.authstate.pw_gid) < 0) ||
+			(initgroups(ses.authstate.pw_name, 
+						ses.authstate.pw_gid) < 0)) {
+			dropbear_exit("Error changing user group");
+		}
+		if (setuid(ses.authstate.pw_uid) < 0) {
+			dropbear_exit("Error changing user");
+		}
+	} else {
+		/* ... but if the daemon is the same uid as the requested uid, we don't
+		 * need to */
+
+		/* XXX - there is a minor issue here, in that if there are multiple
+		 * usernames with the same uid, but differing groups, then the
+		 * differing groups won't be set (as with initgroups()). The solution
+		 * is for the sysadmin not to give out the UID twice */
+		if (getuid() != ses.authstate.pw_uid) {
+			dropbear_exit("Couldn't	change user as non-root");
+		}
+	}
+#endif
+
+	/* set env vars */
+	addnewvar("USER", ses.authstate.pw_name);
+	addnewvar("LOGNAME", ses.authstate.pw_name);
+	addnewvar("HOME", ses.authstate.pw_dir);
+	addnewvar("PATH", DEFAULT_PATH);
+	if (chansess->term != NULL) {
+		addnewvar("TERM", chansess->term);
+	}
+
+	if (chansess->tty) {
+		addnewvar("SSH_TTY", chansess->tty);
+	}
+	
+	if (chansess->connection_string) {
+		addnewvar("SSH_CONNECTION", chansess->connection_string);
+	}
+
+	if (chansess->client_string) {
+		addnewvar("SSH_CLIENT", chansess->client_string);
+	}
+	
+#if DROPBEAR_SVR_PUBKEY_OPTIONS_BUILT
+	if (chansess->original_command) {
+		addnewvar("SSH_ORIGINAL_COMMAND", chansess->original_command);
+	}
+#endif
+
+	/* change directory */
+	if (chdir(ses.authstate.pw_dir) < 0) {
+		dropbear_exit("Error changing directory");
+	}
+
+	char * sftpargs[] = {"sftpserver"};
+	sftp_main(1, sftpargs);
+	
+	/* only reached on error */
+	dropbear_exit("Child failed");
 }
 
 /* Clean up, drop to user privileges, set up the environment and execute
