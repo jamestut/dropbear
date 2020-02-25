@@ -123,6 +123,7 @@ void svr_getopts(int argc, char ** argv) {
 	unsigned int i, j;
 	char ** next = NULL;
 	int nextisport = 0;
+	int nextisextended = 0;
 	char* recv_window_arg = NULL;
 	char* keepalive_arg = NULL;
 	char* idle_timeout_arg = NULL;
@@ -157,6 +158,13 @@ void svr_getopts(int argc, char ** argv) {
 	svr_opts.noremotetcp = 0;
 #endif
 
+	/* default server's extended options */
+	svr_opts.chroot = 0;
+	svr_opts.chrootdir = NULL;
+	svr_opts.pwauthmode = DROPBEAR_PWAUTH_DEFAULT;
+	svr_opts.pwauth_fixed = NULL;
+	svr_opts.pwauth_otp_len = 6;
+
 #ifndef DISABLE_ZLIB
 	opts.compress_mode = DROPBEAR_COMPRESS_DELAYED;
 #endif 
@@ -183,7 +191,7 @@ void svr_getopts(int argc, char ** argv) {
 		if (argv[i][0] != '-' || argv[i][1] == '\0')
 			dropbear_exit("Invalid argument: %s", argv[i]);
 
-		for (j = 1; (c = argv[i][j]) != '\0' && !next && !nextisport; j++) {
+		for (j = 1; (c = argv[i][j]) != '\0' && !next && !nextisport && !nextisextended; j++) {
 			switch (c) {
 				case 'b':
 					next = &svr_opts.bannerfile;
@@ -283,6 +291,9 @@ void svr_getopts(int argc, char ** argv) {
 					print_version();
 					exit(EXIT_SUCCESS);
 					break;
+				case 'x':
+					nextisextended = 1;
+					break;
 				default:
 					fprintf(stderr, "Invalid option -%c\n", c);
 					printhelp(argv[0]);
@@ -291,7 +302,7 @@ void svr_getopts(int argc, char ** argv) {
 			}
 		}
 
-		if (!next && !nextisport)
+		if (!next && !nextisport && !nextisextended)
 			continue;
 
 		if (c == '\0') {
@@ -316,7 +327,68 @@ void svr_getopts(int argc, char ** argv) {
 				addhostkey(keyfile);
 				keyfile = NULL;
 			}
+		} else if (nextisextended) {
+			nextisextended = 0;
+			/* split arguments in the form of key=value */
+			char* delim = strchr(argv[i], '=');
+			char* value = delim ? delim + 1 : NULL;
+			char* key = argv[i];
+			if(delim) *delim = 0;
+			
+			if(strcmp(key, "chroot") == 0) {
+				svr_opts.chroot = 1;
+			} else if (strcmp(key, "chrootdir") == 0) {
+				if (!value) {
+					dropbear_exit("chroot directory must be set");
+				} else {
+					svr_opts.chrootdir = m_strdup(value);
+				}
+			} else if (strcmp(key, "pwauth") == 0) {
+				if(!value) {
+					dropbear_exit("specify password authentication mode");
+				} else if (strcmp(value, "default") == 0) {
+					// no change
+				} else if (strcmp(value, "any") == 0) {
+					dropbear_log(LOG_WARNING, 
+						"Password authentication is set to 'any'. "
+						"Any password including empty passwords will "
+						"be authenticated.");
+					svr_opts.pwauthmode = DROPBEAR_PWAUTH_ANY;
+				} else if (strcmp(value, "fixed") == 0) {
+					svr_opts.pwauthmode = DROPBEAR_PWAUTH_FIXED;
+				} else if (strcmp(value, "otp") == 0) {
+					svr_opts.pwauthmode = DROPBEAR_PWAUTH_OTP;
+				} else {
+					dropbear_exit("unsupported password authentication mode");
+				}
+			} else if (strcmp(key, "pwauthfixed") == 0) {
+				if(!value) {
+					dropbear_exit("specify fixed password");
+				} else {
+					svr_opts.pwauth_fixed = m_strdup(value);
+				}
+			} else if (strcmp(key, "pwauthotplen") == 0) {
+				if(!value) {
+					dropbear_exit("specify a positive integer for OTP password length");
+				} else {
+					int len = atoi(value);
+					if(len <= 0 || len > DROPBEAR_MAX_PASSWORD_LEN) {
+						dropbear_exit("invalid OTP password length range");
+					}
+					svr_opts.pwauth_otp_len = len;
+				}
+			} else {
+				dropbear_exit("unsupported extended option key");
+			}
 		}
+	}
+
+	/* check extended options validity */
+	if(svr_opts.pwauthmode == DROPBEAR_PWAUTH_FIXED && !svr_opts.pwauth_fixed) {
+		dropbear_exit("please specify fixed passphrase for fixed mode of pwauth");
+	}
+	if(svr_opts.chroot && !svr_opts.chrootdir) {
+		dropbear_log(LOG_INFO, "no chroot directory specified. user's home directory will be used as the chroot directory.");
 	}
 
 	/* Set up listening ports */

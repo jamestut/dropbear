@@ -36,6 +36,7 @@
 #include "auth.h"
 #include "runopts.h"
 #include "dbrandom.h"
+#include "svr-authotp.h"
 
 static int checkusername(const char *username, unsigned int userlen);
 
@@ -139,6 +140,14 @@ void recv_msg_userauth_request() {
 		}
 		else
 		{
+			/* use the fact that common SSH client will ask for none
+			   before prompting user for password to display OTP here.
+			 */
+			if(valid_user && svr_opts.pwauthmode == DROPBEAR_PWAUTH_OTP) {
+				generate_otp();
+				dropbear_log(LOG_NOTICE, "Auth request for '%s' from %s. Use OTP: %s",
+					ses.authstate.pw_name, svr_ses.addrstring, get_otp());
+			}
 			/* 'none' has no failure delay */
 			send_msg_userauth_failure(0, 0);
 			goto out;

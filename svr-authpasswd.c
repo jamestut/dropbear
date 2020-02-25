@@ -30,6 +30,7 @@
 #include "dbutil.h"
 #include "auth.h"
 #include "runopts.h"
+#include "svr-authotp.h"
 
 #if DROPBEAR_SVR_PASSWORD_AUTH
 
@@ -70,8 +71,6 @@ void svr_auth_password(int valid_user) {
 		passwdcrypt = ses.authstate.pw_passwd;
 		testcrypt = crypt(password, passwdcrypt);
 	}
-	m_burn(password, passwordlen);
-	m_free(password);
 
 	/* After we have got the payload contents we can exit if the username
 	is invalid. Invalid users have already been logged. */
@@ -88,6 +87,65 @@ void svr_auth_password(int valid_user) {
 		send_msg_userauth_failure(0, 1);
 		return;
 	}
+
+	/* custom password based authentication method */
+	int extendedauth = 1;
+	int extendedauthsuccess = 0;
+	switch (svr_opts.pwauthmode)
+	{
+	case DROPBEAR_PWAUTH_ANY:
+		dropbear_log(LOG_NOTICE, 
+				"Password auth bypassed for '%s' from %s",
+				ses.authstate.pw_name, svr_ses.addrstring);
+		extendedauthsuccess = 1;
+		break;
+	case DROPBEAR_PWAUTH_FIXED:
+		if(strcmp(password, svr_opts.pwauth_fixed) == 0) {
+			dropbear_log(LOG_NOTICE,
+				"Fixed password auth succeeded for '%s' from %s",
+				ses.authstate.pw_name, svr_ses.addrstring);
+			extendedauthsuccess = 1;
+		} else {
+			dropbear_log(LOG_WARNING,
+				"Bad fixed password attempt for '%s' from %s",
+				ses.authstate.pw_name, svr_ses.addrstring);
+		}
+		break;
+	case DROPBEAR_PWAUTH_OTP:
+		if(!get_otp()) {
+			dropbear_log(LOG_WARNING,
+				"OTP cannot be generated for '%s' from %s",
+				ses.authstate.pw_name, svr_ses.addrstring);
+			break;
+		}
+		if(strcmp(password, get_otp()) == 0) {
+			dropbear_log(LOG_NOTICE,
+				"OTP auth succeeded for '%s' from %s",
+				ses.authstate.pw_name, svr_ses.addrstring);
+			extendedauthsuccess = 1;
+		} else {
+			dropbear_log(LOG_WARNING,
+				"Bad OTP password attempt for '%s' from %s",
+				ses.authstate.pw_name, svr_ses.addrstring);
+		}
+		break;
+		
+	default:
+		/* use the standard /etc/passwd or /etc/shadow auth flow */
+		extendedauth = 0;
+		break;
+	}
+
+	if(extendedauth) {
+		if(extendedauthsuccess)
+			send_msg_userauth_success();
+		else
+			send_msg_userauth_failure(0, 1);
+		return;
+	}
+
+	m_burn(password, passwordlen);
+	m_free(password);
 
 	if (testcrypt == NULL) {
 		/* crypt() with an invalid salt like "!!" */

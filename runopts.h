@@ -53,6 +53,14 @@ typedef struct runopts {
 	} compress_mode;
 #endif
 
+	/* enum for extended options */
+	enum {
+		DROPBEAR_PWAUTH_DEFAULT,
+		DROPBEAR_PWAUTH_ANY,
+		DROPBEAR_PWAUTH_FIXED,
+		DROPBEAR_PWAUTH_OTP
+	} pwauth_mode;
+
 #if DROPBEAR_USER_ALGO_LIST
 	char *cipher_list;
 	char *mac_list;
@@ -124,6 +132,13 @@ typedef struct svr_runopts {
 	char * pidfile;
 
 	char * forced_command;
+
+	/*extended options*/
+	int chroot;
+	char * chrootdir;
+	int pwauthmode;
+	char * pwauth_fixed;
+	uint16_t pwauth_otp_len;
 
 } svr_runopts;
 
