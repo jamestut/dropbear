@@ -39,6 +39,8 @@
 #include "auth.h"
 #include "startsftp.h"
 
+#include <unistd.h>
+
 /* Handles sessions (either shells or programs) requested by the client */
 
 static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
@@ -388,7 +390,9 @@ static void chansessionrequest(struct Channel *channel) {
 	dropbear_assert(chansess != NULL);
 	TRACE(("type is %s", type))
 
-	if (strcmp(type, "window-change") == 0) {
+	if(svr_opts.sftponly && strcmp(type, "subsystem")) {
+		ret = DROPBEAR_FAILURE;
+	} else if (strcmp(type, "window-change") == 0) {
 		ret = sessionwinchange(chansess);
 	} else if (strcmp(type, "shell") == 0) {
 		ret = sessioncommand(channel, chansess, 0, 0);
@@ -660,6 +664,7 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 		int iscmd, int issubsys) {
 
 	unsigned int cmdlen = 0;
+	int issftp = 0;
 	int ret;
 
 	TRACE(("enter sessioncommand"))
@@ -685,7 +690,7 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 		if (issubsys) {
 #if DROPBEAR_SFTPSERVER
 			if ((cmdlen == 4) && strncmp(chansess->cmd, "sftp", 4) == 0) {
-				// do nothing
+				issftp = 1;
 			} else 
 #endif
 			{
@@ -695,6 +700,8 @@ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
 		}
 	}
 	
+	if(svr_opts.sftponly && !issftp)
+		return DROPBEAR_FAILURE;
 
 	/* take global command into account */
 	if (svr_opts.forced_command) {
@@ -996,6 +1003,18 @@ static void execinternalsftp(const void *user_data) {
 #endif /* DEBUG_VALGRIND */
 
 #if DROPBEAR_SVR_MULTIUSER
+	/* attempt to chroot and cwd */
+	if (svr_opts.chroot) {
+		if(chroot(svr_opts.chrootdir ? svr_opts.chrootdir : ses.authstate.pw_dir) < 0) {
+			dropbear_exit("Error chroot");
+		}
+		chdir("/");
+	} else {
+		if (chdir(ses.authstate.pw_dir) < 0) {
+			dropbear_exit("Error changing directory");
+		}
+	}
+
 	/* We can only change uid/gid as root ... */
 	if (getuid() == 0) {
 
@@ -1048,11 +1067,6 @@ static void execinternalsftp(const void *user_data) {
 	}
 #endif
 
-	/* change directory */
-	if (chdir(ses.authstate.pw_dir) < 0) {
-		dropbear_exit("Error changing directory");
-	}
-
 	char * sftpargs[] = {"sftpserver"};
 	sftp_main(1, sftpargs);
 	
@@ -1092,6 +1106,18 @@ static void execchild(const void *user_data) {
 #endif /* DEBUG_VALGRIND */
 
 #if DROPBEAR_SVR_MULTIUSER
+	/* attempt to chroot and cwd */
+	if (svr_opts.chroot) {
+		if(chroot(svr_opts.chrootdir ? svr_opts.chrootdir : ses.authstate.pw_dir) < 0) {
+			dropbear_exit("Error chroot");
+		}
+		chdir("/");
+	} else {
+		if (chdir(ses.authstate.pw_dir) < 0) {
+			dropbear_exit("Error changing directory");
+		}
+	}
+
 	/* We can only change uid/gid as root ... */
 	if (getuid() == 0) {
 
@@ -1144,11 +1170,6 @@ static void execchild(const void *user_data) {
 		addnewvar("SSH_ORIGINAL_COMMAND", chansess->original_command);
 	}
 #endif
-
-	/* change directory */
-	if (chdir(ses.authstate.pw_dir) < 0) {
-		dropbear_exit("Error changing directory");
-	}
 
 #if DROPBEAR_X11FWD
 	/* set up X11 forwarding if enabled */

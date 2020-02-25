@@ -160,6 +160,7 @@ void svr_getopts(int argc, char ** argv) {
 
 	/* default server's extended options */
 	svr_opts.chroot = 0;
+	svr_opts.sftponly = 0;
 	svr_opts.chrootdir = NULL;
 	svr_opts.pwauthmode = DROPBEAR_PWAUTH_DEFAULT;
 	svr_opts.pwauth_fixed = NULL;
@@ -377,6 +378,8 @@ void svr_getopts(int argc, char ** argv) {
 					}
 					svr_opts.pwauth_otp_len = len;
 				}
+			} else if (strcmp(key, "sftponly") == 0) {
+				svr_opts.sftponly = 1;
 			} else {
 				dropbear_exit("unsupported extended option key");
 			}

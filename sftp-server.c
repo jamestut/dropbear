@@ -55,7 +55,7 @@
 static LogLevel log_level = SYSLOG_LEVEL_ERROR;
 
 /* Our client */
-static struct passwd *pw = NULL;
+// static struct passwd *pw = NULL;
 static char *client_addr = NULL;
 
 /* input and output queue */
@@ -1412,8 +1412,7 @@ process(void)
 	cp = sshbuf_ptr(iqueue);
 	msg_len = get_u32(cp);
 	if (msg_len > SFTP_MAX_MSG_LENGTH) {
-		error("bad message from %s local user %s",
-		    client_addr, pw->pw_name);
+		error("bad message from %s",client_addr);
 		sftp_server_cleanup_exit(11);
 	}
 	if (buf_len < msg_len + 4)
@@ -1474,11 +1473,6 @@ process(void)
 void
 sftp_server_cleanup_exit(int i)
 {
-	if (pw != NULL && client_addr != NULL) {
-		handle_log_exit();
-		logit("session closed for local user %s from [%s]",
-		    pw->pw_name, client_addr);
-	}
 	_exit(i);
 }
 
@@ -1513,7 +1507,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	__progname = ssh_get_progname(argv[0]);
 	log_init(__progname, log_level, log_facility, log_stderr);
 
-	pw = pwcopy(user_pw);
+	// pw = pwcopy(user_pw);
 
 	while (!skipargs && (ch = getopt(argc, argv,
 	    "d:f:l:P:p:Q:u:cehR")) != -1) {
@@ -1606,8 +1600,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	} else
 		client_addr = xstrdup("UNKNOWN");
 
-	logit("session opened for local user %s from [%s]",
-	    pw->pw_name, client_addr);
+	logit("session opened from [%s]", client_addr);
 
 	in = STDIN_FILENO;
 	out = STDOUT_FILENO;

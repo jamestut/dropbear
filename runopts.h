@@ -134,6 +134,7 @@ typedef struct svr_runopts {
 	char * forced_command;
 
 	/*extended options*/
+	int sftponly;
 	int chroot;
 	char * chrootdir;
 	int pwauthmode;
