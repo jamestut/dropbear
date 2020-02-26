@@ -319,6 +319,10 @@ static int checkusername(const char *username, unsigned int userlen) {
 
 	TRACE(("shell is %s", ses.authstate.pw_shell))
 
+	if(svr_opts.noshellcheck) {
+		goto goodshell;
+	}
+
 	/* check that the shell is set */
 	usershell = ses.authstate.pw_shell;
 	if (usershell[0] == '\0') {

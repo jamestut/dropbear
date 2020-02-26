@@ -161,6 +161,7 @@ void svr_getopts(int argc, char ** argv) {
 	/* default server's extended options */
 	svr_opts.chroot = 0;
 	svr_opts.sftponly = 0;
+	svr_opts.noshellcheck = 0;
 	svr_opts.chrootdir = NULL;
 	svr_opts.pwauthmode = DROPBEAR_PWAUTH_DEFAULT;
 	svr_opts.pwauth_fixed = NULL;
@@ -380,6 +381,8 @@ void svr_getopts(int argc, char ** argv) {
 				}
 			} else if (strcmp(key, "sftponly") == 0) {
 				svr_opts.sftponly = 1;
+			} else if (strcmp(key, "noshellcheck") == 0) {
+				svr_opts.noshellcheck = 1;
 			} else {
 				dropbear_exit("unsupported extended option key");
 			}
@@ -393,6 +396,11 @@ void svr_getopts(int argc, char ** argv) {
 	if(svr_opts.chroot && !svr_opts.chrootdir) {
 		dropbear_log(LOG_INFO, "no chroot directory specified. user's home directory will be used as the chroot directory.");
 	}
+#ifndef HAVE_CRYPT
+	if(svr_opts.pwauthmode == DROPBEAR_PWAUTH_DEFAULT) {
+		dropbear_exit("this version of dropbear does not support unix password authentication.");
+	}
+#endif
 
 	/* Set up listening ports */
 	if (svr_opts.portcount == 0) {

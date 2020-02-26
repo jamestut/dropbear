@@ -236,7 +236,7 @@ If you test it please contact the Dropbear author */
 #endif
 
 #if DROPBEAR_SVR_PASSWORD_AUTH && !HAVE_CRYPT
-	#error "DROPBEAR_SVR_PASSWORD_AUTH requires `crypt()'."
+	// #error "DROPBEAR_SVR_PASSWORD_AUTH requires `crypt()'."
 #endif
 
 #if !(DROPBEAR_SVR_PASSWORD_AUTH || DROPBEAR_SVR_PAM_AUTH || DROPBEAR_SVR_PUBKEY_AUTH)

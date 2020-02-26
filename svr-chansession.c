@@ -1011,7 +1011,7 @@ static void execinternalsftp(const void *user_data) {
 		chdir("/");
 	} else {
 		if (chdir(ses.authstate.pw_dir) < 0) {
-			dropbear_exit("Error changing directory");
+			dropbear_log(LOG_WARNING, "Error changing directory");
 		}
 	}
 
@@ -1114,7 +1114,7 @@ static void execchild(const void *user_data) {
 		chdir("/");
 	} else {
 		if (chdir(ses.authstate.pw_dir) < 0) {
-			dropbear_exit("Error changing directory");
+			dropbear_log(LOG_WARNING, "Error changing directory");
 		}
 	}
 

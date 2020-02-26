@@ -66,11 +66,6 @@ void svr_auth_password(int valid_user) {
 	}
 
 	password = buf_getstring(ses.payload, &passwordlen);
-	if (valid_user && passwordlen <= DROPBEAR_MAX_PASSWORD_LEN) {
-		/* the first bytes of passwdcrypt are the salt */
-		passwdcrypt = ses.authstate.pw_passwd;
-		testcrypt = crypt(password, passwdcrypt);
-	}
 
 	/* After we have got the payload contents we can exit if the username
 	is invalid. Invalid users have already been logged. */
@@ -144,6 +139,14 @@ void svr_auth_password(int valid_user) {
 		return;
 	}
 
+#ifdef HAVE_CRYPT
+	/* standard password auth flow */
+	if (valid_user && passwordlen <= DROPBEAR_MAX_PASSWORD_LEN) {
+		/* the first bytes of passwdcrypt are the salt */
+		passwdcrypt = ses.authstate.pw_passwd;
+		testcrypt = crypt(password, passwdcrypt);
+	}
+
 	m_burn(password, passwordlen);
 	m_free(password);
 
@@ -177,6 +180,11 @@ void svr_auth_password(int valid_user) {
 				svr_ses.addrstring);
 		send_msg_userauth_failure(0, 1);
 	}
+#else
+    /* execution should not reach this as it is guarded by the argument parser. */
+    dropbear_log(LOG_CRIT, "Standard password auth is not available.");
+    send_msg_userauth_failure(0, 1);
+#endif
 }
 
 #endif
